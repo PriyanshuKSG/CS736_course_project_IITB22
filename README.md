@@ -1,10 +1,9 @@
-# 🧠 Shape Analysis using PCA, KPCA, and LLE
+# Shape Analysis using PCA, KPCA, and LLE
 
 This project explores shape representation and retrieval using dimensionality reduction techniques — Principal Component Analysis (PCA), Kernel PCA (KPCA), and Locally Linear Embedding (LLE). We apply these methods to medical images from the KiTS23 dataset and generic shapes from the MPEG-7 dataset. The goal is to analyze shape variations, learn compact representations, and evaluate retrieval performance across and within datasets.
 
----
 
-## 📁 Folder Structure
+## Folder Structure
 ```bash
 .
 ├── code/
@@ -19,9 +18,7 @@ This project explores shape representation and retrieval using dimensionality re
 ├── lle/                    # Contains visual results and embeddings from LLE
 
 
----
-
-## 📊 Datasets
+## Folder Structure
 
 ### 1. MPEG-7 Shape Dataset  
 - URL: [https://dabi.temple.edu/external/shape/MPEG7/dataset.html](https://dabi.temple.edu/external/shape/MPEG7/dataset.html)  

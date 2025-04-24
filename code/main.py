@@ -2,7 +2,7 @@ import os
 os.environ["OMP_NUM_THREADS"] = "1"
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy.ndimage import distance_transform_edt
+from scipy.ndimage import distance_transform_edt, center_of_mass
 from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import euclidean_distances
 import random
@@ -10,6 +10,38 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.decomposition import KernelPCA
 from sklearn.manifold import LocallyLinearEmbedding
+from scipy.ndimage import shift
+from skimage.transform import resize
+from skimage.transform import rotate
+
+def align_orientation(mask):
+    coords = np.argwhere(mask)
+    coords = coords - coords.mean(axis=0)
+    U, S, Vt = np.linalg.svd(coords.T @ coords)
+    angle = np.arctan2(Vt[0, 1], Vt[0, 0])
+    
+    return rotate(mask, angle * 180 / np.pi, resize=False, preserve_range=True).astype(np.uint8)
+
+def preprocess(mask):
+    m1 = center_image(mask)
+    m2 = scale_image(m1)
+    m3 = align_orientation(m2)
+    return m3
+
+def scale_image(mask, output_size=64):
+    coords = np.argwhere(mask)
+    minr, minc = coords.min(axis=0)
+    maxr, maxc = coords.max(axis=0)
+    cropped = mask[minr:maxr+1, minc:maxc+1]
+    return resize(cropped, (output_size, output_size), preserve_range=True, anti_aliasing=False).astype(np.uint8)
+
+
+def center_image(mask):
+    cy, cx = center_of_mass(mask)
+    shift_y = mask.shape[0] // 2 - cy
+    shift_x = mask.shape[1] // 2 - cx
+    return shift(mask, shift=(shift_y, shift_x), mode='nearest')
+
 
 def silhouette_and_scatter_plot(Z, method):
     kmeans = KMeans(n_clusters=3, n_init=10, random_state=97).fit(Z[:, :2])      # pick 3 or 4 clusters
@@ -26,7 +58,12 @@ def silhouette_and_scatter_plot(Z, method):
 def compute_sdf(mask):
     pos = distance_transform_edt(mask)
     neg = distance_transform_edt(1 - mask)
-    return pos - neg
+    sdf = pos - neg
+
+    max_abs = np.max(np.abs(sdf))
+    if max_abs == 0:
+        return sdf  # or return np.zeros_like(sdf), depending on your use case
+    return sdf / max_abs
 
 def perform_pca(sdf):
     
@@ -50,9 +87,9 @@ def perform_pca(sdf):
 
     return Z
 
-def perform_kernelPCA(sdf):
+def perform_kernelPCA(sdf, gamma=1.0/4096):
 
-    kpca = KernelPCA(n_components=sdf.shape[0], kernel='rbf', gamma=1.0/4096) 
+    kpca = KernelPCA(n_components=sdf.shape[0], kernel='rbf', gamma=gamma) 
     Z_kpca = kpca.fit_transform(sdf)
 
     eigenvalues = np.var(Z_kpca, axis=0)
@@ -149,7 +186,9 @@ def get_sdf(A):
 
     sdf_list = []
     for m in masks:
-        sdf_list.append(compute_sdf(m))
+        #m_preprocessed = preprocess(m) # after alignment
+        m_preprocessed = m # before alignment
+        sdf_list.append(compute_sdf(m_preprocessed))
     
     A_sdf = np.stack(sdf_list).reshape(200, -1)  # (200,4096)
 
@@ -187,5 +226,5 @@ if __name__=="__main__":
     #lle_embeddings = perform_lle(get_sdf(X))
     #perform_retrieval(X, lle_embeddings, "LLE")
 
-    #lle_embeddings_combined = perform_lle(get_sdf(combined))
-    #perform_retrieval(combined, lle_embeddings_combined, "LLE")
+    lle_embeddings_combined = perform_lle(get_sdf(combined), n_neighbors=10)
+    perform_retrieval(combined, lle_embeddings_combined, "LLE")
